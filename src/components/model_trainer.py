@@ -1,6 +1,7 @@
 import sys
 import os
 from dataclasses import dataclass
+import numpy as np
 
 #from catboost import CatBoostRegressor
 from sklearn.ensemble import (
@@ -39,21 +40,60 @@ class ModelTrainer:
                 test_array[:,-1]
             )
 
+            # Validate data
+            logging.info("Validating training and test data")
+            X_train, y_train = self._validate_data(X_train, y_train)
+            X_test, y_test = self._validate_data(X_test, y_test)
+
 
             models={
                 "Random Forest": RandomForestRegressor(),
                 "Decision Tree": DecisionTreeRegressor(),
                 "Gradient Boosting": GradientBoostingRegressor(),
                 "Linear Regression": LinearRegression(),
-                "K-Neighbors Classifier": KNeighborsRegressor(),
-                "XGBClassifier": XGBRegressor(),
+                #"K-Neighbors Classifier": KNeighborsRegressor(),
+                "XGBRegressor": XGBRegressor(),
                 #"CatBoosting Classifier": CatBoostRegressor(verbose=False),
-                "AdaBoost Regressor": AdaBoostRegressor()
+                "AdaBoost Regressor": AdaBoostRegressor(),
 
+            }
+            
+            params={
+                "Decision Tree": {
+                    'criterion':['squared_error', 'friedman_mse', 'absolute_error', 'poisson'],
+                    # 'splitter':['best','random'],
+                    # 'max_features':['sqrt','log2'],
+                },
+                "Random Forest":{
+                    # 'criterion':['squared_error', 'friedman_mse', 'absolute_error', 'poisson'],
+                 
+                    # 'max_features':['sqrt','log2',None],
+                    'n_estimators': [8,16,32,64,128,256]
+                },
+                "Gradient Boosting":{
+                    # 'loss':['squared_error', 'huber', 'absolute_error', 'quantile'],
+                    'learning_rate':[.1,.01,.05,.001],
+                    'subsample':[0.6,0.7,0.75,0.8,0.85,0.9],
+                    # 'criterion':['squared_error', 'friedman_mse'],
+                    # 'max_features':['auto','sqrt','log2'],
+                    'n_estimators': [8,16,32,64,128,256]
+                },
+                "Linear Regression":{},
+                "XGBRegressor":{
+                    'learning_rate':[.1,.01,.05,.001],
+                    'n_estimators': [8,16,32,64,128,256]
+                },
+                 "AdaBoost Regressor": {
+                    'learning_rate': [.1, .01, 0.5, .001],
+                    'n_estimators': [8, 16, 32, 64, 128, 256]
+                }
+                
+               
+                
             }
 
             model_report:dict=evaluate_models(X_train=X_train, y_train=y_train,X_test=X_test,y_test=y_test,
-                                              models=models)
+                                              models=models, param=params)
 
             ## To get best model score from dist
             best_model_score=max(sorted(model_report.values()))
@@ -85,10 +125,19 @@ class ModelTrainer:
             #logging.info(f"Best model R2 score: {R2_square:.2%}")
             
             return  best_model_name, R2_square
-
-
-
-
-
+        
         except Exception as e:
             raise CustomException(e,sys)
+        
+    def _validate_data(self, X, y):
+        if np.any(np.isnan(X)) or np.any(np.isinf(X)):
+            X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+        if np.any(np.isnan(y)) or np.any(np.isinf(y)):
+            y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
+        return X, y
+
+
+
+
+
+        
